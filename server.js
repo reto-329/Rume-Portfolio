@@ -2,11 +2,18 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const helmet = require('helmet');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(helmet());
+app.use(
+  express.static('public', {
+    maxAge: '7d', // Cache static assets for 7 days
+    etag: true
+  })
+);
 
 // Add CORS headers
 app.use((req, res, next) => {
@@ -20,7 +27,7 @@ app.use((req, res, next) => {
 });
 
 app.get('/config', (req, res) => {
-  res.json({ API_URL: `http://localhost:${PORT}` });
+  res.json({ API_URL: process.env.API_URL });
 });
 
 // Set EJS as view engine
@@ -58,6 +65,13 @@ app.post('/send-email', async (req, res) => {
   }
 });
 
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
+
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at ${process.env.API_URL}`);
 });
