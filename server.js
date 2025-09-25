@@ -26,6 +26,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/image', express.static(path.join(__dirname, 'image')));
 
+// Public config endpoint for EmailJS keys
+app.get('/config/emailjs', (req, res) => {
+    res.json({
+        EMAILJS_PUBLIC_KEY: process.env.PUBLIC_KEY || '',
+        EMAILJS_SERVICE_ID: process.env.SERVICE_ID || '',
+        EMAILJS_TEMPLATE_ID: process.env.TEMPLATE_ID || ''
+    });
+});
+
 // Serve PDF files statically
 app.use('/pdf', express.static(path.join(__dirname)));
 
@@ -57,69 +66,7 @@ app.get('/view-cv', (req, res) => {
 });
 
 // Contact Form Submission
-app.post('/send-message', async (req, res) => {
-    try {
-        const { name, email, subject, message } = req.body;
-
-        // Basic validation
-        if (!name || !email || !subject || !message) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'All fields are required' 
-            });
-        }
-
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Please enter a valid email address' 
-            });
-        }
-
-        // Create transporter
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
-            }
-        });
-
-        // Email content
-        const mailOptions = {
-            from: email,
-            to: process.env.EMAIL_USER,
-            subject: `Portfolio Contact: ${subject}`,
-            html: `
-                <h3>New Message from Portfolio Contact Form</h3>
-                <p><strong>Name:</strong> ${name}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Subject:</strong> ${subject}</p>
-                <p><strong>Message:</strong></p>
-                <p>${message.replace(/\n/g, '<br>')}</p>
-                <hr>
-                <p><small>Sent from your portfolio website</small></p>
-            `
-        };
-
-        // Send email
-        await transporter.sendMail(mailOptions);
-        
-        res.json({ 
-            success: true, 
-            message: 'Message sent successfully! I will get back to you soon.' 
-        });
-
-    } catch (error) {
-        console.error('Error sending email:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to send message. Please try again later.' 
-        });
-    }
-});
+// EmailJS is now used for contact form submissions. No backend email sending required.
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -35,64 +35,50 @@ document.addEventListener('DOMContentLoaded', function() {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Sending...';
 
-            try {
-                const response = await fetch('/send-message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-
-                // Show status message
-                showStatusMessage(result.success, result.message);
-
-                if (result.success) {
-                    contactForm.reset();
-                }
-
-            } catch (error) {
-                console.error('Error:', error);
-                showStatusMessage(false, 'Network error. Please try again.');
-            } finally {
-                // Re-enable submit button
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Send Message';
+            // Use EmailJS to send email directly from frontend
+            // Load EmailJS SDK if not already loaded
+            if (typeof emailjs === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js';
+                script.onload = sendEmailWithEmailJS;
+                document.body.appendChild(script);
+            } else {
+                sendEmailWithEmailJS();
             }
-        });
-    }
 
-    // Form validation
-    function validateForm(data) {
-        // Clear previous status
-        formStatus.className = '';
-        formStatus.textContent = '';
-
-        // Check for empty fields
-        for (const key in data) {
-            if (!data[key].trim()) {
-                showStatusMessage(false, 'Please fill in all fields.');
-                return false;
+            function sendEmailWithEmailJS() {
+                // Fetch EmailJS keys from public config endpoint
+                fetch('/config/emailjs')
+                    .then(response => response.json())
+                    .then(config => {
+                        emailjs.init(config.EMAILJS_PUBLIC_KEY);
+                        return emailjs.send(config.EMAILJS_SERVICE_ID, config.EMAILJS_TEMPLATE_ID, {
+                            from_name: data.name,
+                            from_email: data.email,
+                            subject: data.subject,
+                            message: data.message
+                        });
+                    })
+                    .then(function() {
+                        formStatus.textContent = 'Message sent successfully!';
+                        formStatus.style.color = 'green';
+                        contactForm.reset();
+                    }, function(error) {
+                        formStatus.textContent = 'Failed to send message. Please try again later.';
+                        formStatus.style.color = 'red';
+                    })
+                    .finally(function() {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Send Message';
+                    });
             }
-        }
-
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(data.email)) {
-            showStatusMessage(false, 'Please enter a valid email address.');
-            return false;
-        }
-
-        return true;
+            });
     }
 
     // Show status message
     function showStatusMessage(isSuccess, message) {
         formStatus.textContent = message;
         formStatus.className = isSuccess ? 'success' : 'error';
-        
         // Auto-hide success message after 5 seconds
         if (isSuccess) {
             setTimeout(() => {
