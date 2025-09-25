@@ -1,77 +1,62 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const nodemailer = require('nodemailer');
 const helmet = require('helmet');
+const nodemailer = require('nodemailer');
+const bodyParser = require('body-parser');
+
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Middleware
 app.use(helmet());
-app.use(
-  express.static('public', {
-    maxAge: '7d', // Cache static assets for 7 days
-    etag: true
-  })
-);
-
-// Add CORS headers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
-app.get('/config', (req, res) => {
-  res.json({ API_URL: process.env.API_URL });
-});
-
-// Set EJS as view engine
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Render index.ejs for root route
+// Home route
 app.get('/', (req, res) => {
   res.render('index');
 });
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-app.post('/send-email', async (req, res) => {
+// Contact form route
+app.post('/contact', async (req, res) => {
   const { name, email, subject, message } = req.body;
-  
+  // Basic validation
+  if (!name || !email || !subject || !message) {
+    return res.status(400).json({ success: false, error: 'All fields are required.' });
+  }
+  // Email format validation
+  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, error: 'Invalid email address.' });
+  }
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+    // Email options
+    const mailOptions = {
+      from: `${name} <${email}>`,
       to: process.env.EMAIL_USER,
       subject: `Portfolio Contact: ${subject}`,
-      text: `From: ${name} (${email})\n\nMessage: ${message}`
-    });
-    
-    res.json({ success: true, message: 'Email sent successfully!' });
-  } catch (error) {
-    console.error('Email error:', error);
-    res.status(500).json({ success: false, message: 'Failed to send email' });
+      text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\nMessage: ${message}`
+    };
+    // Send email
+    await transporter.sendMail(mailOptions);
+    res.json({ success: true, message: 'Message sent successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to send message. Please try again later.' });
   }
-});
-
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running at ${process.env.API_URL}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
